@@ -1,0 +1,130 @@
+/* Layout tổng thể */
+.product-detail-container {
+    max-width: 1200px;
+    margin: 120px auto 40px; /* Cách Header ra một chút */
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Chia đôi màn hình: Ảnh trái, Info phải */
+.product-main-info {
+    display: flex;
+    gap: 50px;
+    margin-bottom: 50px;
+}
+
+/* Xử lý cái ảnh "rõ to" của bạn */
+.product-image-section {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.main-product-img {
+    max-width: 100%;
+    max-height: 500px; /* Giới hạn chiều cao để không bị quá to */
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+/* Cột thông tin bên phải */
+.product-info-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-name-title {
+    font-size: 32px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.product-price-display {
+    font-size: 36px;
+    color: #ee4d2d; /* Màu cam Shopee */
+    font-weight: bold;
+    margin-bottom: 30px;
+}
+
+.product-description-box {
+    margin-bottom: 40px;
+    line-height: 1.8;
+    color: #666;
+}
+
+.product-description-box h3 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+/* Nút bấm */
+.add-cart-large-btn {
+    padding: 18px;
+    background-color: #ee4d2d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.add-cart-large-btn:hover {
+    background-color: #d73211;
+}
+
+/* Phần AI - Sản phẩm tương tự */
+.similar-products-wrapper {
+    border-top: 1px solid #eee;
+    padding-top: 40px;
+}
+
+.section-title {
+    font-size: 24px;
+    margin-bottom: 25px;
+    color: #333;
+}
+
+.similar-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.similar-item-card {
+    background: #fff;
+    border: 1px solid #eee;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.similar-item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.similar-item-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    margin-bottom: 10px;
+}
+
+.similar-name {
+    font-size: 14px;
+    height: 40px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.similar-price {
+    color: #ee4d2d;
+    font-weight: bold;
+}

@@ -1,0 +1,63 @@
+package com.webthuongmai.controller;
+import com.webthuongmai.dto.LoginRequest;
+import com.webthuongmai.dto.RegisterRequest;
+import com.webthuongmai.entity.Role;
+import com.webthuongmai.entity.User;
+import com.webthuongmai.repository.RoleRepository;
+import com.webthuongmai.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin("*")
+public class AuthController {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            return ResponseEntity.badRequest().body("Mật khẩu xác nhận không khớp");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email đã được sử dụng");
+        }
+        if (userRepository.existsByPhone(request.getPhone())) {
+            return ResponseEntity.badRequest().body("Số điện thoại đã được sử dụng");
+        }
+
+        User user = new User();
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setPassword(request.getPassword()); 
+        user.setBirthday(request.getBirthday());
+        user.setGender(request.getGender());
+
+        // Gán Role mặc định là USER (Giả sử ID 2)
+        Role role = roleRepository.findById(2L).orElse(null);
+        user.setRole(role);
+
+        userRepository.save(user);
+        return ResponseEntity.ok("Đăng ký thành công");
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        Optional<User> userOpt = userRepository.findByEmailOrPhone(request.getEmailOrPhone(), request.getEmailOrPhone());
+        
+        if (userOpt.isPresent() && userOpt.get().getPassword().equals(request.getPassword())) {
+            return ResponseEntity.ok(userOpt.get());
+        }
+        
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email/Số điện thoại hoặc mật khẩu không đúng");
+    }
+}
