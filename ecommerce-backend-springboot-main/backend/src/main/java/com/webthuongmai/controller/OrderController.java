@@ -1,9 +1,15 @@
 package com.webthuongmai.controller;
+import com.webthuongmai.dto.OrderDetailModalDTO;
+import com.webthuongmai.dto.OrderRequestDTO;
 import com.webthuongmai.entity.Order;
 import com.webthuongmai.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -17,8 +23,51 @@ public class OrderController {
         return orderService.getAllOrders();
     }
 
+    @GetMapping("/payment-methods")
+    public ResponseEntity<List<Map<String, String>>> getPaymentMethods() {
+        List<Map<String, String>> methods = Arrays.asList(
+                Map.of("id", "COD", "name", "Thanh toán khi nhận hàng (COD)"),
+                Map.of("id", "MOMO", "name", "Ví điện tử MoMo"),
+                Map.of("id", "BANK", "name", "Chuyển khoản ngân hàng")
+        );
+        return ResponseEntity.ok(methods);
+    }
+
+    @GetMapping("/estimate-delivery")
+    public ResponseEntity<Map<String, String>> getEstimateDelivery() {
+        LocalDate fromDate = LocalDate.now().plusDays(3);
+        LocalDate toDate = LocalDate.now().plusDays(5);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM");
+
+        Map<String, String> result = new HashMap<>();
+        result.put("estimateText", "Đảm bảo nhận hàng vào ngày " + fromDate.format(formatter) + " - " + toDate.format(formatter));
+
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping
     public Order create(@RequestBody Order order) {
         return orderService.createOrder(order);
+    }
+
+    @PostMapping("/place")
+    public ResponseEntity<String> placeOrder(@RequestBody OrderRequestDTO request) {
+        return ResponseEntity.ok(orderService.placeOrder(request));
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Order>> getOrderHistory(@PathVariable Long userId) {
+        return ResponseEntity.ok(orderService.getOrderHistory(userId));
+    }
+
+    @GetMapping("/items/{orderItemId}/details")
+    public ResponseEntity<OrderDetailModalDTO> getOrderItemDetails(@PathVariable Long orderItemId) {
+        return ResponseEntity.ok(orderService.getOrderItemDetails(orderItemId));
+    }
+
+    @PutMapping("/{orderId}/receive")
+    public ResponseEntity<String> receiveOrder(@PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.markOrderAsReceived(orderId));
     }
 }

@@ -1,4 +1,6 @@
 # TẠO DATA ĐÁNH GIÁ & HÀNH VI: DỌN CỖ CHO SVD, PCA+KNN VÀ LOGISTIC REGRESSION
+import sys
+from pathlib import Path
 import random
 import uuid
 import json
@@ -6,6 +8,11 @@ import os
 from datetime import datetime, timedelta
 from faker import Faker
 from sqlalchemy import text
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from app.core.database_connection import SessionLocal
 
 fake = Faker('vi_VN')
@@ -67,22 +74,22 @@ def run_phase_3():
     if not real_reviews_dict: return
 
     try:
-        db.execute(text("DELETE FROM Review_Metas; DELETE FROM Reviews; DELETE FROM Payment_Methods; DELETE FROM Order_Items; DELETE FROM Orders; DELETE FROM User_Activities; DELETE FROM Search_History;"))
+        for table_name in ["review_metas", "reviews", "payment_methods", "order_items", "orders", "user_activities", "search_history"]:
+            db.execute(text(f"DELETE FROM {table_name}"))
         db.commit()
 
-        users = db.execute(text("SELECT UserID FROM Users")).fetchall()
+        users = db.execute(text("SELECT userid FROM Users")).fetchall()
         user_ids = [u[0] for u in users]
         
-        addresses = db.execute(text("SELECT AddressID, UserID FROM Addresses")).fetchall()
+        addresses = db.execute(text("SELECT addressid, userid FROM address")).fetchall()
         user_address_map = {a[1]: a[0] for a in addresses}
         
         variants_raw = db.execute(text("""
-            SELECT v.VariantID, p.ProductID, p.ShopID, v.Price, p.ProductName, c.CategoryName 
-            FROM Product_Variants v
-            JOIN Products p ON v.ProductID = p.ProductID
-            JOIN Product_Categories_Map pcm ON p.ProductID = pcm.ProductID
-            JOIN Categories c ON pcm.CategoryID = c.CategoryID
-            WHERE c.CategoryName IN ('Thời Trang', 'Sắc Đẹp', 'Máy Tính & Laptop', 'Điện Thoại & Phụ Kiện', 'Thiết Bị Điện Gia Dụng', 'Thiết Bị Điện Tử', 'Phụ Kiện Thông Minh', 'Thể thao')
+            SELECT v.variantid, p.productid, p.shopid, v.price, p.product_name, c.category_name 
+            FROM product_variant v
+            JOIN product p ON v.productid = p.productid
+            JOIN categories c ON p.categoryid = c.categoryid
+            WHERE c.category_name IN ('Thời Trang', 'Sắc Đẹp', 'Máy Tính & Laptop', 'Điện Thoại & Phụ Kiện', 'Thiết Bị Điện Gia Dụng', 'Thiết Bị Điện Tử', 'Phụ Kiện Thông Minh', 'Thể thao')
         """)).fetchall()
 
         tech_variants, fashion_variants, home_variants, sports_variants, all_variants = [], [], [], [], []
@@ -174,7 +181,7 @@ def run_phase_3():
             random.shuffle(session_keywords)
             for idx, kw in enumerate(session_keywords):
                 search_time = order_date - timedelta(hours=2) + timedelta(minutes=random.randint(5, 15) * idx)
-                db.execute(text("INSERT INTO Search_History (UserID, Keyword, CreatedAt) VALUES (:u, :k, :d)"), 
+                db.execute(text("INSERT INTO search_history (userid, keyword, created_at) VALUES (:u, :k, :d)"), 
                            {"u": buyer_id, "k": kw, "d": search_time})
             
             # --- 2. XEM NHƯNG KHÔNG MUA ---
@@ -182,17 +189,17 @@ def run_phase_3():
             viewed_products = random.sample(all_variants, num_views)
             for vp in viewed_products:
                 view_time = order_date - timedelta(minutes=random.randint(20, 100))
-                db.execute(text("INSERT INTO User_Activities (UserID, ProductID, ActionType, Timestamp) VALUES (:u, :p, 'View', :d)"), 
+                db.execute(text("INSERT INTO user_activities (userid, productid, action_type, timestamp) VALUES (:u, :p, 'View', :d)"), 
                            {"u": buyer_id, "p": vp['pid'], "d": view_time})
                 if random.random() < 0.15:
                     cart_time = view_time + timedelta(minutes=random.randint(1, 5))
-                    db.execute(text("INSERT INTO User_Activities (UserID, ProductID, ActionType, Timestamp) VALUES (:u, :p, 'AddToCart', :d)"), 
+                    db.execute(text("INSERT INTO user_activities (userid, productid, action_type, timestamp) VALUES (:u, :p, 'AddToCart', :d)"), 
                                {"u": buyer_id, "p": vp['pid'], "d": cart_time})
 
             # --- 3. TẠO ORDER MẸ ---
             res = db.execute(text("""
-                INSERT INTO Orders (BuyerID, ShopID, AddressID, OrderDate, PaymentStatus, ShippingStatus) 
-                OUTPUT INSERTED.OrderID VALUES (:b, :s, :a, :od, 'Paid', 'Completed')
+                INSERT INTO orders (buyerid, shopid, addressid, order_date, payment_status, shipping_status) 
+                OUTPUT INSERTED.orderid VALUES (:b, :s, :a, :od, 'Paid', 'Completed')
             """), {"b": buyer_id, "s": shop_id, "a": address_id, "od": order_date})
             order_id = res.fetchone()[0]
 
@@ -200,9 +207,9 @@ def run_phase_3():
 
             # --- 4. TẠO CÁC ORDER ITEMS VÀ ĐÁNH GIÁ ---
             for ov in order_variants:
-                db.execute(text("INSERT INTO User_Activities (UserID, ProductID, ActionType, Timestamp) VALUES (:u, :p, 'View', :d)"), 
+                db.execute(text("INSERT INTO user_activities (userid, productid, action_type, timestamp) VALUES (:u, :p, 'View', :d)"), 
                            {"u": buyer_id, "p": ov['pid'], "d": order_date - timedelta(minutes=10)})
-                db.execute(text("INSERT INTO User_Activities (UserID, ProductID, ActionType, Timestamp) VALUES (:u, :p, 'AddToCart', :d)"), 
+                db.execute(text("INSERT INTO user_activities (userid, productid, action_type, timestamp) VALUES (:u, :p, 'AddToCart', :d)"), 
                            {"u": buyer_id, "p": ov['pid'], "d": order_date - timedelta(minutes=2)})
 
                 qty = random.randint(1, 2)
@@ -210,8 +217,8 @@ def run_phase_3():
                 total_amount += qty * price
 
                 res_item = db.execute(text("""
-                    INSERT INTO Order_Items (OrderID, VariantID, Quantity, Price) 
-                    OUTPUT INSERTED.OrderItemID VALUES (:o, :v, :q, :p)
+                    INSERT INTO order_items (orderid, variantid, quantity, price) 
+                    OUTPUT INSERTED.order_itemid VALUES (:o, :v, :q, :p)
                 """), {"o": order_id, "v": ov['vid'], "q": qty, "p": price})
                 order_item_id = res_item.fetchone()[0]
 
@@ -228,16 +235,16 @@ def run_phase_3():
                     review_device = str(uuid.uuid4())
 
                 res_review = db.execute(text("""
-                    INSERT INTO Reviews (ProductID, UserID, OrderItemID, Rating, Comment, ReviewDate, IsFake) 
-                    OUTPUT INSERTED.ReviewID VALUES (:p, :u, :oi, :r, :c, :rd, :f)
+                    INSERT INTO reviews (productid, userid, order_itemid, rating, comment, review_date, is_fake) 
+                    OUTPUT INSERTED.reviewid VALUES (:p, :u, :oi, :r, :c, :rd, :f)
                 """), {"p": ov['pid'], "u": buyer_id, "oi": order_item_id, "r": final_rating, "c": review_comment, "rd": order_date + timedelta(days=2), "f": 1 if is_spam else 0})
                 review_id = res_review.fetchone()[0]
 
-                db.execute(text("INSERT INTO Review_Metas (ReviewID, IP_Address, DeviceID) VALUES (:r, :ip, :d)"), 
+                db.execute(text("INSERT INTO review_metas (reviewid, ip_address, deviceid) VALUES (:r, :ip, :d)"), 
                            {"r": review_id, "ip": review_ip, "d": review_device})
 
             # --- 5. TẠO THANH TOÁN ---
-            db.execute(text("INSERT INTO Payment_Methods (OrderID, Method, PaymentDate, Amount) VALUES (:o, :m, :pd, :a)"), 
+            db.execute(text("INSERT INTO payment_methods (orderid, method, payment_date, amount) VALUES (:o, :m, :pd, :a)"), 
                        {"o": order_id, "m": random.choice(['COD', 'VNPay']), "pd": order_date, "a": total_amount})
 
             if (i + 1) % 1000 == 0:

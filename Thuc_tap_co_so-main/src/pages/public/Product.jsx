@@ -1,89 +1,311 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import '../../styles/public/Product.css';
-import defaultImg from './assets/muado.jpg'; 
+
+// Import ảnh mặc định phòng trường hợp API chưa có ảnh
+import defaultImg from './assets/muado.jpg';
+import avt from './assets/avt-shop.jpg';
 
 export default function Product() {
-    const { id } = useParams(); // Lấy ID từ thanh địa chỉ URL
+    const { id } = useParams();
     const navigate = useNavigate();
+
+    // --- CÁC STATE LƯU DỮ LIỆU ---
     const [product, setProduct] = useState(null);
-    const [similarProducts, setSimilarProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [shop, setShop] = useState(null);
+    const [variants, setVariants] = useState([]);
+    const [images, setImages] = useState([]);
+    
+    const [availableSizes, setAvailableSizes] = useState([]);
+    const [availableColors, setAvailableColors] = useState([]);
+    const [selectedSize, setSelectedSize] = useState('');
+    const [selectedColor, setSelectedColor] = useState('');
+    
+    const [currentImage, setCurrentImage] = useState(defaultImg);
+    const [currentPrice, setCurrentPrice] = useState(0);
+    const [selectedVariantId, setSelectedVariantId] = useState(null);
+    
+    // Thêm State quản lý Số lượng mua
+    const [quantity, setQuantity] = useState(1);
 
+    // 1. GỌI API LẤY CHI TIẾT SẢN PHẨM
     useEffect(() => {
-        const fetchProductData = async () => {
-            setLoading(true);
+        const fetchProductDetail = async () => {
             try {
-                // 1. Gọi API lấy chi tiết sản phẩm vừa tạo ở Backend
-                const res = await fetch(`http://localhost:8081/api/products/${id}`);
-                if (res.ok) {
-                    const data = await res.json();
+                const response = await fetch(`http://localhost:8081/api/products/${id}`);
+                if (response.ok) {
+                    const data = await response.json();
                     setProduct(data);
+                    setShop(data.shop || null);
 
-                    // 2. Gọi API lấy sản phẩm tương tự (Tính năng AI)
-                    if (data.category) {
-                        const categoryId = data.category.categoryID || data.category.id;
-                        const similarRes = await fetch(`http://localhost:8081/api/products/${id}/similar?categoryId=${categoryId}`);
-                        if (similarRes.ok) {
-                            const similarData = await similarRes.json();
-                            setSimilarProducts(similarData);
-                        }
+                    const productImages = data.images || data.productImages || [];
+                    if (productImages.length > 0) {
+                        const imgUrls = productImages.map(img => img.imageURL || img.imageUrl);
+                        setImages(imgUrls);
+                        setCurrentImage(imgUrls[0]);
+                    } else {
+                        setImages([defaultImg]);
+                        setCurrentImage(defaultImg);
+                    }
+
+                    const productVariants = data.variants || data.productVariants || [];
+                    setVariants(productVariants);
+
+                    if (productVariants.length > 0) {
+                        const sizes = [...new Set(productVariants.map(v => v.size || v.sizeName).filter(Boolean))];
+                        const colors = [...new Set(productVariants.map(v => v.color || v.colorName).filter(Boolean))];
+                        
+                        setAvailableSizes(sizes);
+                        setAvailableColors(colors);
+
+                        if (sizes.length > 0) setSelectedSize(sizes[0]);
+                        if (colors.length > 0) setSelectedColor(colors[0]);
+
+                        setCurrentPrice(productVariants[0].price || productVariants[0].productPrice || 0);
+                        setSelectedVariantId(productVariants[0].variantID || productVariants[0].variantid || productVariants[0].id);
                     }
                 }
             } catch (error) {
-                console.error("Lỗi kết nối API:", error);
-            } finally {
-                setLoading(false);
+                console.error("Lỗi khi tải chi tiết sản phẩm:", error);
             }
         };
 
-        if (id) fetchProductData();
+        fetchProductDetail();
     }, [id]);
 
-    if (loading) return <div className="loading-state">Đang tải thông tin sản phẩm...</div>;
-    if (!product) return <div className="error-state">Không tìm thấy sản phẩm yêu cầu!</div>;
+    // 2. TỰ ĐỘNG ĐỔI GIÁ VÀ VARIANT_ID KHI CHỌN SIZE/COLOR
+    useEffect(() => {
+        if (variants.length > 0) {
+            const matchedVariant = variants.find(v => 
+                (v.size || v.sizeName) === selectedSize && 
+                (v.color || v.colorName) === selectedColor
+            );
+
+            if (matchedVariant) {
+                setCurrentPrice(matchedVariant.price || matchedVariant.productPrice || 0);
+                setSelectedVariantId(matchedVariant.variantID || matchedVariant.variantid || matchedVariant.id);
+            } else if (variants.length > 0) {
+                setCurrentPrice(variants[0].price || variants[0].productPrice || 0);
+                setSelectedVariantId(variants[0].variantID || variants[0].variantid || variants[0].id);
+            }
+        }
+    }, [selectedSize, selectedColor, variants]);
+
+    // Hàm xử lý tăng giảm số lượng
+    const handleDecrease = () => {
+        if (quantity > 1) setQuantity(prev => prev - 1);
+    };
+
+    const handleIncrease = () => {
+        setQuantity(prev => prev + 1);
+    };
+
+    // 3. HÀM THÊM VÀO GIỎ HÀNG
+    const handleAddToCart = async () => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            alert("Vui lòng đăng nhập để thêm đồ vào giỏ nhé!");
+            navigate('/login');
+            return;
+        }
+
+        if (!selectedVariantId) {
+            alert("Vui lòng chọn Kích thước và Màu sắc hợp lệ!");
+            return;
+        }
+
+        const userId = user.userID || user.userid || user.id;
+
+        try {
+            const response = await fetch(`http://localhost:8081/api/carts/add`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: userId,
+                    variantId: selectedVariantId,
+                    quantity: quantity // Truyền số lượng thực tế user đã chọn
+                })
+            });
+
+            if (response.ok) {
+                alert(`🛒 Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+            } else {
+                alert("Lỗi: Không thể thêm vào giỏ.");
+            }
+        } catch (error) {
+            alert("Không thể kết nối đến server!");
+        }
+    };
+
+    const renderStars = (score) => {
+        const positiveStars = Math.floor(score || 5); 
+        return "⭐".repeat(positiveStars);
+    };
+
+    if (!product) return <div style={{marginTop: '120px', textAlign: 'center'}}>Đang tải dữ liệu sản phẩm...</div>;
 
     return (
-        <div className='product-detail-container'>
-            {/* Nội dung chi tiết sản phẩm */}
-            <div className='product-main-info'>
-                <div className='product-image-section'>
-                    <img src={defaultImg} alt={product.productName} className="main-product-img" />
-                </div>
-                <div className='product-info-section'>
-                    <h1 className="product-name-title">{product.productName}</h1>
-                    <div className="product-price-display">
-                        {product.price?.toLocaleString('vi-VN')}đ
-                    </div>
-                    <div className='product-description-box'>
-                        <h3>Mô tả chi tiết:</h3>
-                        <p>{product.description || "Sản phẩm này hiện chưa có bài viết mô tả chi tiết."}</p>
-                    </div>
-                    <button className='add-cart-large-btn'>THÊM VÀO GIỎ HÀNG</button>
-                </div>
-            </div>
-
-            {/* Danh sách sản phẩm tương tự (AI Gợi ý) */}
-            {similarProducts.length > 0 && (
-                <div className='similar-products-wrapper'>
-                    <h2 className='section-title'>Sản phẩm tương tự có thể bạn quan tâm</h2>
-                    <div className='similar-products-grid'>
-                        {similarProducts.map(item => (
-                            <div 
-                                key={item.productID} 
-                                className='similar-item-card' 
-                                onClick={() => navigate(`/product/${item.productID}`)}
-                            >
-                                <img src={defaultImg} alt={item.productName} />
-                                <div className='similar-info'>
-                                    <p className='similar-name'>{item.productName}</p>
-                                    <span className='similar-price'>{item.price?.toLocaleString('vi-VN')}đ</span>
-                                </div>
-                            </div>
+        <div className='product-container'>
+            {/* Chi tiết Sản phẩm */}
+            <div className='item-details'>
+                <div className='item-img-group'>
+                    <img className='item-main-img' src={currentImage} alt={product.productName} />
+                    <div className='item-sub-images'>
+                        {images.map((img, index) => (
+                            <img 
+                                key={index} 
+                                src={img} 
+                                alt={`sub-${index}`} 
+                                className={`sub-img ${currentImage === img ? 'active-thumb' : ''}`}
+                                onClick={() => setCurrentImage(img)} 
+                            />
                         ))}
                     </div>
                 </div>
-            )}
+                <div className='item-details-group'>
+                    <h1 className='product-name'>{product.productName || product.productname}</h1>
+                    
+                    <div className='product-meta'>
+                        {renderStars(shop?.rating || 5)}
+                        <span className='sales'> | Đã bán {product.soldCount || "0"}</span>
+                    </div>
+
+                    <div className='product-price'>{Number(currentPrice).toLocaleString('vi-VN')} ₫</div>
+
+                    <div className='product-description'>
+                        <p>{product.description || "Đang cập nhật mô tả sản phẩm..."}</p>
+                    </div>
+                    <br />
+
+                    <div className='selection-group'>
+                        <p>Vận chuyển:</p>
+                        <p className='shipping-date-text'>* Đảm bảo nhận hàng vào ngày 5/5 - 14/5</p>
+                    </div>
+                    <br />
+
+                    {/* Kích thước */}
+                    {availableSizes.length > 0 && (
+                        <div className='selection-group'>
+                            <p>Kích thước:</p>
+                            <div className='options'>
+                                {availableSizes.map(size => (
+                                    <button 
+                                        key={size}
+                                        className={`opt-btn ${selectedSize === size ? 'active' : ''}`}
+                                        onClick={() => setSelectedSize(size)}
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <br />
+
+                    {/* Màu sắc */}
+                    {availableColors.length > 0 && (
+                        <div className='selection-group'>
+                            <p>Màu sắc: <strong>{selectedColor}</strong></p>
+                            <div className='options'>
+                                {availableColors.map(color => (
+                                    <button 
+                                        key={color}
+                                        className={`opt-btn ${selectedColor === color ? 'active' : ''}`}
+                                        onClick={() => setSelectedColor(color)}
+                                    >
+                                        {color}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <br />
+
+                    {/* Khối chọn Số lượng mới thêm */}
+                    <div className='selection-group'>
+                        <p>Số lượng:</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                            <button 
+                                onClick={handleDecrease}
+                                style={{ padding: '8px 15px', border: '1px solid #ccc', background: 'white', cursor: 'pointer', borderRadius: '4px'}}
+                            >
+                                -
+                            </button>
+                            <span style={{ fontSize: '16px', fontWeight: '500', width: '30px', textAlign: 'center' }}>
+                                {quantity}
+                            </span>
+                            <button 
+                                onClick={handleIncrease}
+                                style={{ padding: '8px 15px', border: '1px solid #ccc', background: 'white', cursor: 'pointer', borderRadius: '4px'}}
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className='add-to-cart'>
+                        <button className='add-to-cart-btn' onClick={handleAddToCart}>Thêm vào giỏ hàng</button>
+                        <button className='buy-now'>Mua ngay</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Đánh giá */}
+            <div className='review-section'>
+                <div className='review-header'>
+                    <h3>Đánh giá ({shop?.rating || 4}⭐)</h3>
+                    <span className='show-more-text'>Hiển thị thêm</span>
+                </div>
+                
+                <div className='review-content'>
+                    <div className='review-user'>
+                        <strong>Nguyễn Văn A</strong>
+                        <span className='review-stars'>5⭐</span>
+                        <span className='review-date'>20/03/2024</span>
+                    </div>
+                    <p className='review-text'>Áo đẹp lắm mọi người ơi, vải dày dặn!</p>
+                </div>
+            </div>
+
+            {/* Shop Card */}        
+            <div className='shop-card'>
+                <div className='shop-info-left'>
+                    <Link to={`/shop/${shop?.shopID || 1}`} style={{ textDecoration: 'none' }}>
+                        <img src={avt} alt="shop-avatar" className='shop-avatar' />
+                    </Link>
+                    <div className='shop-details'>
+                        <Link to={`/shop/${shop?.shopID || 1}`} style={{ textDecoration: 'none' }}>
+                            <h3 className='shop-name'>{shop?.shopName || 'The Artisan Collective'}</h3>
+                        </Link>
+                        <p className='shop-rating'>
+                            <span className='stars'>⭐⭐⭐⭐</span>⭐ {shop?.rating || 4.2} ({shop?.reviews || '1.2k'} Đánh giá)
+                        </p>
+                        <p className='shop-desc'>
+                            {shop?.description || 'Unique, ethically sourced handmade goods from global artisans. Since 2018.'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className='shop-metrics'>
+                    <div className='metric'>
+                        <strong>{shop?.productCount || 158}</strong>
+                        <span>Sản phẩm</span>
+                    </div>
+                    <div className='metric'>
+                        <strong>{shop?.followers || 8200}</strong>
+                        <span>Theo dõi</span>
+                    </div>
+                    <div className='metric'>
+                        <strong>{shop?.sales || '45k'}</strong>
+                        <span>Lượt bán</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Sản phẩm tương tự */}
+            <div className='item-similar'>
+                <h3 style={{fontSize: '20px', color: '#333'}}>Sản phẩm tương tự</h3>
+            </div>
         </div>
     );
 }

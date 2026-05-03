@@ -1,4 +1,5 @@
 package com.webthuongmai.entity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ public class Address {
 
     @ManyToOne
     @JoinColumn(name = "UserID")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
 
     private String receiverName;

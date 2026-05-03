@@ -5,20 +5,20 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-# 1. Lấy thông tin từ file .env (hoặc nhập trực tiếp nếu chưa có .env)
-DB_USER = os.getenv("DB_USER", "root") # Mặc định là root
-DB_PASSWORD = os.getenv("DB_PASSWORD", "321300") # Thay bằng mật khẩu MySQL của bạn
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME", "ecommerce_db")
+SERVER = os.getenv("DB_SERVER")
+DATABASE = os.getenv("DB_NAME")
+# Thêm 2 dòng này để lấy thông tin đăng nhập
+USER = os.getenv("DB_USER")
+PASSWORD = os.getenv("DB_PASSWORD")
 
-print(f"--- ĐANG KẾT NỐI DATABASE: {DB_NAME} ---")
+print("KIỂM TRA SERVER:", SERVER)
+print("KIỂM TRA DATABASE:", DATABASE)
+# Có thể print thêm dòng này để test xem nó nhận pass chưa (sau khi chạy OK thì nên xóa đi cho bảo mật)
+# print("KIỂM TRA USER:", USER) 
 
-# 2. Đổi URL từ mssql sang mysql
-# Chúng ta sử dụng thư viện pymysql để Python nói chuyện được với MySQL
-SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# CÚ PHÁP MỚI: mssql+pyodbc://{USER}:{PASSWORD}@{SERVER}/{DATABASE}
+SQLALCHEMY_DATABASE_URL = f"mssql+pyodbc://{USER}:{PASSWORD}@{SERVER}/{DATABASE}?driver=ODBC+Driver+17+for+SQL+Server"
 
-# 3. Khởi tạo engine
 engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

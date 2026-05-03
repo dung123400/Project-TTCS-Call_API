@@ -1,35 +1,40 @@
 package com.webthuongmai.entity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 @Entity
-@Table(name = "shop") // MySQL thường phân biệt hoa thường hoặc để chữ thường
+@Table(name = "Shop")
 @Data
 public class Shop {
     @Id
-    @Column(name = "ShopID") // Khớp với ảnh DB
     private Long shopID;
 
     @OneToOne
     @MapsId
-    @JoinColumn(name = "ShopID") // ID của sốp cũng là ID của User
+    @JoinColumn(name = "shopID")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
 
-    @Column(name = "ShopName", nullable = false) // Khớp PascalCase
+    @Column(nullable = false)
     private String shopName;
 
-    @Column(name = "Description")
     private String description;
-
-    @Column(name = "Rating")
     private Double rating = 0.0;
 
-    @Column(name = "CreatedAt", updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
-
-    @Column(name = "UpdatedAt")
     private LocalDateTime updatedAt = LocalDateTime.now();
-
-    @Column(name = "DeletedAt")
     private LocalDateTime deletedAt;
+
+    @Column(name = "follower_count")
+    private Integer followerCount = 0;
+
+    public Integer getFollowerCount() {
+        return followerCount;
+    }
+
+    public void setFollowerCount(Integer followerCount) {
+        this.followerCount = followerCount;
+    }
 }

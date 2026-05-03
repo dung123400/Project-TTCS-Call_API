@@ -1,4 +1,6 @@
 # TẠO DATA LIÊN KẾT: TỰ ĐỘNG DỊCH TIẾNG ANH (CSV) SANG TIẾNG VIỆT & MAPPING TAG THÔNG MINH
+import sys
+from pathlib import Path
 import csv
 import random
 import os
@@ -7,6 +9,11 @@ import itertools
 import unidecode
 from faker import Faker
 from sqlalchemy import text
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from app.core.database_connection import SessionLocal
 
 fake = Faker('vi_VN')
@@ -200,28 +207,28 @@ def get_or_create_category(db, cat_cache, c_name):
     c_name = c_name.strip()
     if c_name in cat_cache: return cat_cache[c_name]
         
-    existing = db.execute(text("SELECT CategoryID FROM Categories WHERE CategoryName = :n"), {"n": c_name}).fetchone()
+    existing = db.execute(text("SELECT categoryid FROM categories WHERE category_name = :n"), {"n": c_name}).fetchone()
     if existing:
         cat_cache[c_name] = existing[0]
         return existing[0]
         
     try:
-        res = db.execute(text("INSERT INTO Categories (CategoryName) OUTPUT INSERTED.CategoryID VALUES (:n)"), {"n": c_name})
+        res = db.execute(text("INSERT INTO categories (category_name) OUTPUT INSERTED.categoryid VALUES (:n)"), {"n": c_name})
         new_id = res.fetchone()[0]
         db.commit()
         cat_cache[c_name] = new_id
         return new_id
     except Exception:
         db.rollback()
-        max_id = db.execute(text("SELECT ISNULL(MAX(CategoryID), 0) FROM Categories")).fetchone()[0]
+        max_id = db.execute(text("SELECT ISNULL(MAX(categoryid), 0) FROM categories")).fetchone()[0]
         new_id = max_id + 1
         try:
-            db.execute(text("SET IDENTITY_INSERT Categories ON"))
-            db.execute(text("INSERT INTO Categories (CategoryID, CategoryName) VALUES (:i, :n)"), {"i": new_id, "n": c_name})
-            db.execute(text("SET IDENTITY_INSERT Categories OFF"))
+            db.execute(text("SET IDENTITY_INSERT categories ON"))
+            db.execute(text("INSERT INTO categories (categoryid, category_name) VALUES (:i, :n)"), {"i": new_id, "n": c_name})
+            db.execute(text("SET IDENTITY_INSERT categories OFF"))
         except:
             db.rollback()
-            db.execute(text("INSERT INTO Categories (CategoryID, CategoryName) VALUES (:i, :n)"), {"i": new_id, "n": c_name})
+            db.execute(text("INSERT INTO categories (categoryid, category_name) VALUES (:i, :n)"), {"i": new_id, "n": c_name})
         db.commit()
         cat_cache[c_name] = new_id
         return new_id
@@ -236,7 +243,7 @@ def run_phase_2():
     db = SessionLocal()
     try:
         
-        tables = ['Categories', 'Products', 'Product_Variants', 'Product_Images', 'Shops', 'Addresses', 'Tags']
+        tables = ['categories', 'product', 'product_variant', 'product_image', 'shop', 'address', 'tags']
         for t in tables:
             try:
                 db.execute(text(f"DBCC CHECKIDENT ('{t}')"))
@@ -244,39 +251,38 @@ def run_phase_2():
             except:
                 db.rollback()
         
-        user_data = db.execute(text("SELECT UserID, Phone, FullName FROM Users")).fetchall()
+        user_data = db.execute(text("SELECT userid, phone, full_name FROM Users")).fetchall()
         user_info_map = {r[0]: {"phone": r[1], "name": r[2]} for r in user_data}
         user_ids = list(user_info_map.keys())
-        role_map = {r[1]: r[0] for r in db.execute(text("SELECT RoleID, RoleName FROM Roles")).fetchall()}
-        tag_data = db.execute(text("SELECT TagID, TagName FROM Tags")).fetchall()
+        role_map = {r[1]: r[0] for r in db.execute(text("SELECT roleid, role_name FROM Roles")).fetchall()}
+        tag_data = db.execute(text("SELECT tagid, tag_name FROM Tags")).fetchall()
         
         if not user_ids:
             return
 
         seller_ids = random.sample(user_ids, int(len(user_ids) * 0.1))
-        shop_specialized_map = {} 
+        seller_shop_map = {}
         main_cats_list = list(MAIN_CAT_TRANSLATE.keys())
+        next_shop_id = db.execute(text("SELECT ISNULL(MAX(shopid), 0) FROM shop")).fetchone()[0]
 
-        # Tạo Shop
+        # Gán role cho user và tạo shop cho seller
         for uid in user_ids:
-            db.execute(text("""
-                IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r)
-                INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)
-            """), {"u": uid, "r": role_map['Customer']})
+            db.execute(text("UPDATE Users SET roleid = :r WHERE userid = :u"), {"u": uid, "r": role_map['Customer']})
             
             if uid in seller_ids:
                 assigned_cat = random.choice(main_cats_list)
-                shop_specialized_map[uid] = assigned_cat
-                db.execute(text("""
-                    IF NOT EXISTS (SELECT 1 FROM User_Roles WHERE UserID = :u AND RoleID = :r)
-                    INSERT INTO User_Roles (UserID, RoleID) VALUES (:u, :r)
-                """), {"u": uid, "r": role_map['Seller']})
+                db.execute(text("UPDATE Users SET roleid = :r WHERE userid = :u"), {"u": uid, "r": role_map['Seller']})
                 
                 vn_cat_name = MAIN_CAT_TRANSLATE[assigned_cat]
-                db.execute(text("IF NOT EXISTS (SELECT 1 FROM Shops WHERE ShopID = :s) INSERT INTO Shops (ShopID, ShopName, Description, Rating) VALUES (:s, :n, :d, :r)"),
-                           {"s": uid, "n": f"Cửa hàng {vn_cat_name} {fake.last_name()}", 
-                            "d": f"Chuyên cung cấp {vn_cat_name} chính hãng toàn cầu.", 
-                            "r": round(random.uniform(3.0, 5.0), 2)})
+                next_shop_id += 1
+                res_shop = db.execute(text("""
+                    INSERT INTO shop (shopid, shop_name, description, rating)
+                    VALUES (:i, :n, :d, :r)
+                """), {"i": next_shop_id,
+                         "n": f"Cửa hàng {vn_cat_name} {fake.last_name()}", 
+                         "d": f"Chuyên cung cấp {vn_cat_name} chính hãng toàn cầu.", 
+                         "r": round(random.uniform(3.0, 5.0), 2)})
+                seller_shop_map[uid] = next_shop_id
         db.commit()
 
         # SINH ĐỊA CHỈ
@@ -295,7 +301,7 @@ def run_phase_2():
                 da = fa["da"] + str(random.randint(10, 999))
 
             info = user_info_map[uid]
-            db.execute(text("INSERT INTO Addresses (UserID, ReceiverName, Phone, Province, District, Ward, DetailAddress, IsDefault) VALUES (:u, :n, :p, :pv, :dt, :w, :da, 1)"),
+            db.execute(text("INSERT INTO address (userid, receiver_name, phone, province, district, ward, detail_address, is_default) VALUES (:u, :n, :p, :pv, :dt, :w, :da, 1)"),
                        {"u": uid, "n": info["name"], "p": info["phone"], "pv": pv, "dt": dt, "w": w, "da": da})
         db.commit()
 
@@ -357,13 +363,14 @@ def run_phase_2():
         random.shuffle(all_products_pool)
 
         print(f">>> Đang lưu {len(all_products_pool)} sản phẩm và gán Cấu trúc Danh mục/Tag thông minh...")
-        cat_cache = {r[1]: r[0] for r in db.execute(text("SELECT CategoryID, CategoryName FROM Categories")).fetchall()}
+        cat_cache = {r[1]: r[0] for r in db.execute(text("SELECT categoryid, category_name FROM categories")).fetchall()}
         tag_name_to_id = {t[1]: t[0] for t in tag_data}
         
         for item in all_products_pool:
             main_cat = item['cat']
-            matching_sellers = [sid for sid, scat in shop_specialized_map.items() if scat == main_cat]
-            final_sid = random.choice(matching_sellers if matching_sellers else seller_ids)
+            final_shop_id = random.choice(list(seller_shop_map.values())) if seller_shop_map else None
+            if final_shop_id is None:
+                continue
 
             main_cat_vn = MAIN_CAT_TRANSLATE.get(main_cat, 'Khác')
             sub_cat_vn = smart_categorize(item['name'], main_cat)
@@ -386,24 +393,25 @@ def run_phase_2():
                 context_pool = ["Hàng Mới Về", "Top Bán Chạy", "Hàng Chính Hãng", "Lựa Chọn Của Shop"]
                 target_cat_names.append(random.choice(context_pool))
             
-            target_cat_names = list(set(target_cat_names))
-            
-            target_cat_ids = []
+            seen_target_names = set()
+            ordered_target_names = []
             for c_name in target_cat_names:
-                cid = get_or_create_category(db, cat_cache, c_name)
-                target_cat_ids.append(cid)
+                if c_name not in seen_target_names:
+                    seen_target_names.add(c_name)
+                    ordered_target_names.append(c_name)
+
+            main_cat_id = get_or_create_category(db, cat_cache, main_cat_vn)
+            for c_name in ordered_target_names[1:]:
+                get_or_create_category(db, cat_cache, c_name)
 
             cleaned_csv = clean_desc_conflict(item['desc'], main_cat)
             gen_phrase = random.choice(ENRICHED_DESC.get(main_cat, ["Sản phẩm chất lượng cao."]))
             final_desc = clean_and_format_desc(cleaned_csv, gen_phrase)
 
-            res = db.execute(text("""INSERT INTO Products (ProductName, ShopID, Brand, Description) 
-                                   OUTPUT INSERTED.ProductID VALUES (:n, :s, :b, :d)"""), 
-                                   {"n": str(item['name'])[:200], "s": final_sid, "b": brand_name[:100], "d": final_desc[:1000]})
+            res = db.execute(text("""INSERT INTO product (product_name, categoryid, shopid, brand, description) 
+                                   OUTPUT INSERTED.productid VALUES (:n, :c, :s, :b, :d)"""), 
+                                   {"n": str(item['name'])[:200], "c": main_cat_id, "s": final_shop_id, "b": brand_name[:100], "d": final_desc[:1000]})
             pid = res.fetchone()[0]
-
-            for cid in target_cat_ids:
-                db.execute(text("INSERT INTO Product_Categories_Map (ProductID, CategoryID) VALUES (:p, :c)"), {"p": pid, "c": cid})
 
             base_min, base_max = PRICE_RANGES.get(main_cat, PRICE_RANGES['Default'])
             base_price = round(random.uniform(base_min, base_max), -4)
@@ -431,7 +439,7 @@ def run_phase_2():
                 s_cl = sanitize_sku_part(cl)
                 sku = f"SKU-{pid}-{s_sz}-{s_cl}"
                 
-                db.execute(text("""INSERT INTO Product_Variants (ProductID, Size, Color, Price, StockQuantity, SKU, Status)
+                db.execute(text("""INSERT INTO product_variant (productid, size, color, price, stock_quantity, sku, status)
                                    VALUES (:p, :sz, :cl, :pr, :st, :s, 'Active')"""),
                                    {"p": pid, "sz": sz, "cl": cl, "pr": variant_price, "st": random.randint(10, 500), "s": sku})
             
@@ -450,9 +458,9 @@ def run_phase_2():
                     final_tags.add(tag_name_to_id[t_name])
 
             for tid in final_tags:
-                db.execute(text("INSERT INTO Product_Tag_Map (ProductID, TagID) VALUES (:p, :t)"), {"p": pid, "t": tid})
+                db.execute(text("INSERT INTO product_tag_map (productid, tagid) VALUES (:p, :t)"), {"p": pid, "t": tid})
 
-            db.execute(text("INSERT INTO Product_Images (ProductID, ImageURL, IsMain) VALUES (:p, :u, 1)"), 
+            db.execute(text("INSERT INTO product_image (productid, image_url, is_main) VALUES (:p, :u, 1)"), 
                        {"p": pid, "u": f"https://picsum.photos/seed/{pid}{main_cat}/600/600"})
 
         db.commit()

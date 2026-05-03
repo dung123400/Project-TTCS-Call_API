@@ -199,9 +199,13 @@ h4 {
     height: 40px;
 }
 
-.delivery-date-text {
+.shipping-date-text {
     color: #46B5C1;
-    font-size: 14px;
+    cursor: default;
+}
+
+.safe-text {
+    color: #ee4d2d;
     cursor: default;
 }
 

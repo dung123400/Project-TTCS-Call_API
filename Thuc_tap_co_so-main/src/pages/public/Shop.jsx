@@ -1,131 +1,107 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import '../../styles/public/Shop.css';
 import avt from './assets/avt-shop.jpg';
 import productImg from './assets/muado.jpg';
 
 export default function Shop() {
-    const { id } = useParams(); 
-    const [shopData, setShopData] = useState(null);
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+    const { name } = useParams();
 
-    // Logic theo dõi (Follow)
-    const [isFollowed, setIsFollowed] = useState(false);
-    const [followerCount, setFollowerCount] = useState(0);
+    const decodedName = name ? decodeURIComponent(name) : "";
 
-    // 1. Gọi dữ liệu từ Backend khi mở trang
-    useEffect(() => {
-        const fetchShopData = async () => {
-            try {
-                // Lấy thông tin sốp
-                const shopRes = await fetch(`http://localhost:8081/api/shops/${id}`);
-                if (shopRes.ok) {
-                    const data = await shopRes.json();
-                    setShopData(data);
-                    // Giả lập số người theo dõi nếu DB chưa có trường này
-                    setFollowerCount(8200); 
-                }
-
-                // Lấy sản phẩm của sốp
-                const productRes = await fetch(`http://localhost:8081/api/products/shop/${id}`);
-                if (productRes.ok) {
-                    setProducts(await productRes.json());
-                }
-            } catch (error) {
-                console.error("Lỗi khi kết nối API sốp:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (id) fetchShopData();
-    }, [id]);
-
-    // 2. Các hàm bổ trợ
-    const handleFollow = () => {
-        setIsFollowed(!isFollowed);
-        setFollowerCount(prev => isFollowed ? prev - 1 : prev + 1);
+    const shopData = {
+        name: decodedName,
+        avatar: avt,
+        rating: 4.2,
+        reviews: "1.2k",
+        description: "Unique, ethically sourced handmade goods from global artisans. Since 2018.",
+        products: 158,
+        followers: 8200,
+        sales: "45k"
     };
 
+    const vouchers = [
+        { id: 1, discount: "100k", target: "Sản phẩm nhất định", expiry: "30.04.2026", status: "Còn" },
+        { id: 2, discount: "50k", target: "Tất cả sản phẩm", expiry: "15.05.2026", status: "Còn" },
+        { id: 3, discount: "10%", target: "Sản phẩm mới", expiry: "01.06.2026", status: "Hết" },
+    ];
+
+    const products = [
+        { id: 1, name: "The Java Handbook siêu dài abc xyz 1", price: 29.99, rating: 4, sold: "1.2k", image: productImg },
+        { id: 2, name: "Clean Code: A Handbook of Agile Software Craftsmanship", price: 35.50, rating: 5, sold: "800", image: productImg },
+        { id: 3, name: "JavaScript: The Good Parts", price: 25.00, rating: 4, sold: "2.5k", image: productImg },
+        { id: 4, name: "Design Patterns: Elements of Reusable Object-Oriented Software", price: 45.99, rating: 5, sold: "500", image: productImg },
+        { id: 5, name: "Pragmatic Programmer, The: From Journeyman to Master", price: 39.00, rating: 4, sold: "1.1k", image: productImg },
+        { id: 6, name: "Introduction to Algorithms, 3rd Edition", price: 60.00, rating: 5, sold: "300", image: productImg },
+        { id: 7, name: "Cracking the Coding Interview", price: 28.50, rating: 4, sold: "4.2k", image: productImg },
+        { id: 8, name: "Refactoring: Improving the Design of Existing Code", price: 42.00, rating: 5, sold: "150", image: productImg },
+    ];
+
+    // Logic theo dõi
+    const [isFollowed, setIsFollowed] = useState(false);
+    const [followerCount, setFollowerCount] = useState(shopData.followers);
+
+    const handleFollow = () => {
+        if (!isFollowed) {
+            setFollowerCount(prev => prev + 1);
+        } else {
+            setFollowerCount(prev => prev - 1);
+        }
+        setIsFollowed(!isFollowed);
+    };
+
+    // Format số 
     const formatNumber = (num) => {
         return num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num;
     };
 
+    // Rating 
     const renderStars = (score) => {
-        const s = Math.round(score || 5);
-        return "⭐".repeat(s) + "☆".repeat(5 - s);
+        const positiveStars = Math.round(score); 
+        return "⭐".repeat(positiveStars) + "☆".repeat(5 - positiveStars);
     };
 
+    // Lưu voucher
     const [savedVouchers, setSavedVouchers] = useState([]);
-    const handleSaveVoucher = (vId) => {
-        if (!savedVouchers.includes(vId)) setSavedVouchers([...savedVouchers, vId]);
-    };
-
-    // Vouchers mẫu (Khi nào Backend có API voucher thì thay sau)
-    const vouchers = [
-        { id: 1, discount: "100k", target: "Sản phẩm nhất định", expiry: "30.04.2026", status: "Còn" },
-        { id: 2, discount: "50k", target: "Tất cả sản phẩm", expiry: "15.05.2026", status: "Còn" }
-    ];
-
-    if (loading) return <div style={{padding: '100px', textAlign: 'center'}}>Đang tìm sốp... 🔎</div>;
-    if (!shopData) return <div style={{padding: '100px', textAlign: 'center'}}>Sốp không tồn tại! 😅</div>;
-
-    const handleAddToCart = async (productId) => {
-    // Tạm thời lấy variantId trùng với productId để test (Vì trang Shop chưa cho chọn size/màu)
-    const variantId = productId; 
-    const user = JSON.parse(localStorage.getItem('user'));
-    const userId = user?.userID || 1;
-
-    try {
-        // CHÚ Ý: URL phải là /api/carts/add (Có chữ S)
-        const response = await fetch('http://localhost:8081/api/carts/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                variantId: variantId, // Phải là variantId để khớp với Backend
-                quantity: 1,
-                userId: userId 
-            })
-        });
-
-        if (response.ok) {
-            alert("Thêm thành công! 🎉");
-        } else {
-            alert("Lỗi server rồi!");
-        }
-        } catch (error) {
-            alert("Vẫn không kết nối được! Hãy kiểm tra xem Backend port 8081 đã RUN chưa?");
+    const handleSaveVoucher = (id) => {
+        if (!savedVouchers.includes(id)) {
+            setSavedVouchers([...savedVouchers, id]);
         }
     };
-    
+
+    const handleProductClick = (id) => {
+        navigate(`/product/${id}`); 
+    };
+
     return (
         <div className='shop-container'>
             <div className='shop-header'>
                 <div className='shop-info'>
                     <div className='info-left'>
-                        {/* Avatar thật hoặc ảnh mẫu */}
-                        <img src={avt} alt="avatar" className='shop-avatar' />
+                        <img src={shopData.avatar} alt="avatar" className='shop-avatar' />
                         <div className='shop-details'>
-                            {/* shopName lấy đúng từ Entity Shop.java */}
-                            <h1>{shopData.shopName}</h1>
+                            <h1>{shopData.name}</h1>
                             <div className='rating'>
                                 {renderStars(shopData.rating)}
-                                <span className='rating-score'>{shopData.rating || 5.0} (Dữ liệu thật)</span>
+                                <span className='rating-score'>{shopData.rating} ({shopData.reviews} Đánh giá)</span>
                             </div>
-                            <p className='description'>{shopData.description || "Chào mừng bạn đến với sốp!"}</p>
+                            <p className='description'>{shopData.description}</p>
                         </div>
                     </div>
 
                     <div className='info-right'>
                         <div className='action-buttons'>
-                            <button className={`btn-follow ${isFollowed ? 'followed' : ''}`} onClick={handleFollow}>
+                            <button 
+                                className={`btn-follow ${isFollowed ? 'followed' : ''}`} 
+                                onClick={handleFollow}
+                            >
                                 {isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
                             </button>
                         </div>
                         <div className='stats'>
                             <div className='stat-item'>
-                                <strong>{products.length}</strong>
+                                <strong>{shopData.products}</strong>
                                 <span>Sản phẩm</span>
                             </div>
                             <div className='stat-item'>
@@ -133,7 +109,7 @@ export default function Shop() {
                                 <span>Theo dõi</span>
                             </div>
                             <div className='stat-item'>
-                                <strong>45k</strong>
+                                <strong>{shopData.sales}</strong>
                                 <span>Lượt bán</span>
                             </div>
                         </div>
@@ -142,7 +118,6 @@ export default function Shop() {
             </div>
 
             <div className='shop-main-content'>
-                {/* Phần Voucher */}
                 <div className='shop-voucher'>
                     <h3>Voucher của Shop</h3>
                     <div className='voucher-list'>
@@ -156,9 +131,14 @@ export default function Shop() {
                                     </div>
                                     <div className='sawtooth'></div>
                                 </div>
+                                
                                 <div className='voucher-right'>
-                                    <button className={`btn-save ${savedVouchers.includes(v.id) ? 'saved' : ''}`} onClick={() => handleSaveVoucher(v.id)}>
-                                        {savedVouchers.includes(v.id) ? 'Dùng ngay' : 'Lưu'}
+                                    <button 
+                                        className={`btn-save ${savedVouchers.includes(v.id) ? 'saved' : ''}`}
+                                        onClick={() => handleSaveVoucher(v.id)}
+                                        disabled={v.status === 'Hết'}
+                                    >
+                                        {v.status === 'Hết' ? 'Hết' : (savedVouchers.includes(v.id) ? 'Dùng ngay' : 'Lưu')}
                                     </button>
                                 </div>
                             </div>
@@ -166,34 +146,41 @@ export default function Shop() {
                     </div>
                 </div>
 
-                {/* Phần Sản phẩm */}
                 <div className='shop-products'>
-                    <h3>Sản phẩm đang bán</h3>
+                    <h3>Sản phẩm</h3>
                     <div className='shop-item'>
                         {products.map((item) => (
-                            <div className='each-product' key={item.productID}>
-                                <img src={productImg} alt={item.productName} className="shop-product-img" />
-                                <div className="shop-product-name">{item.productName}</div>
-                                <div className="shop-product-rating">
-                                    {renderStars(5)} 
-                                    <span className="product_sold">Đã bán 1.2k</span>
+                            <div 
+                                className='each-product' 
+                                key={item.id}
+                                onClick={() => handleProductClick(item.id)}
+                            >
+                                <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="shop-product-img"
+                                />
+
+                                <div className="shop-product-name">
+                                    {item.name}
                                 </div>
+
+                                <div className="rating">
+                                    {renderStars(item.rating)} 
+                                    <span className="product_sold">Đã bán {item.sold}</span>
+                                </div>
+
                                 <div className="shop-product-bottom">
-                                    <span className="shop-product-price">
-                                        {item.price?.toLocaleString('vi-VN') || "120.000"}đ
-                                    </span>
-                                    <button 
-                                        className="shop-product-btn" 
-                                        onClick={() => handleAddToCart(item.productID)} // <--- Gắn sự kiện click vào đây
-                                    >
-                                        Add to Cart
-                                    </button>
+                                    <span className="shop-product-price">${item.price}</span>
+                                    <button className="shop-product-btn">Add to Cart</button>
                                 </div>
                             </div>
                         ))}
                     </div>
+
+                    <p className='product-footer'>Không còn sản phẩm nào!</p>
                 </div>
             </div>
         </div>
-    );
+    )
 }

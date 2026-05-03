@@ -1,10 +1,17 @@
 # TẠO DATA CHO NHỮNG BẢNG ĐỘC LẬP, KHÔNG CÓ FK
+import sys
+from pathlib import Path
 import unidecode
 from datetime import timedelta
 import random
 from faker import Faker
 from sqlalchemy import text
 from passlib.context import CryptContext
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from app.core.database_connection import SessionLocal
 
 fake = Faker('vi_VN')
@@ -37,8 +44,8 @@ def run_phase_1(num_users=15000):
         # 1. BẢNG Roles 
         for role in ["Customer", "Seller", "Admin"]:
             db.execute(text("""
-                IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleName = :r)
-                INSERT INTO Roles (RoleName) VALUES (:r)
+                IF NOT EXISTS (SELECT 1 FROM Roles WHERE role_name = :r)
+                INSERT INTO Roles (role_name) VALUES (:r)
             """), {"r": role})
         db.commit()
         
@@ -125,8 +132,8 @@ def run_phase_1(num_users=15000):
         
         for tag in unique_tags:
             db.execute(text("""
-                IF NOT EXISTS (SELECT 1 FROM Tags WHERE TagName = :t)
-                INSERT INTO Tags (TagName) VALUES (:t)
+                IF NOT EXISTS (SELECT 1 FROM Tags WHERE tag_name = :t)
+                INSERT INTO Tags (tag_name) VALUES (:t)
             """), {"t": tag})
         db.commit()
 
@@ -135,14 +142,14 @@ def run_phase_1(num_users=15000):
         for _ in range(250):
             start_date = fake.date_time_between(start_date='-1y', end_date='now')
             vouchers_data.append({
-                "VoucherType": random.choice(['Shop', 'Platform', 'Shipping']),
-                "DiscountValue": round(random.uniform(5.0, 50.0), 2),
-                "StartDate": start_date.strftime("%Y-%m-%d %H:%M:%S"),
-                "EndDate": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
-                "Status": "Active"
+                "voucher_type": random.choice(['Shop', 'Platform', 'Shipping']),
+                "discount_value": round(random.uniform(5.0, 50.0), 2),
+                "start_date": start_date.strftime("%Y-%m-%d %H:%M:%S"),
+                "end_date": (start_date + timedelta(days=random.randint(15, 60))).strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "Active"
             })
         
-        voucher_query = "INSERT INTO Vouchers (VoucherType, DiscountValue, StartDate, EndDate, Status) VALUES (:VoucherType, :DiscountValue, :StartDate, :EndDate, :Status)"
+        voucher_query = "INSERT INTO Vouchers (voucher_type, discount_value, start_date, end_date, status) VALUES (:voucher_type, :discount_value, :start_date, :end_date, :status)"
         for i in range(0, len(vouchers_data), 100):
             db.execute(text(voucher_query), vouchers_data[i:i+100])
         db.commit()
@@ -153,8 +160,8 @@ def run_phase_1(num_users=15000):
         batch_limit = 1000 
 
         user_query = """
-            INSERT INTO Users (FullName, Email, PasswordHash, Phone, Birthday, Gender, FollowerCount, CreatedAt, Status, LastLoginDate)
-            VALUES (:FullName, :Email, :PasswordHash, :Phone, :Birthday, :Gender, :FollowerCount, :CreatedAt, :Status, :LastLoginDate)
+            INSERT INTO Users (full_name, email, password_hash, phone, birthday, gender, follower_count, created_at, status, last_login_date)
+            VALUES (:full_name, :email, :password_hash, :phone, :birthday, :gender, :follower_count, :created_at, :status, :last_login_date)
         """
 
         current_batch = []
@@ -164,16 +171,16 @@ def run_phase_1(num_users=15000):
             last_login = created_at + timedelta(days=random.randint(1, 30)) if random.random() > 0.1 else None
             
             current_batch.append({
-                "FullName": full_name,
-                "Email": get_unique_email(full_name, email_counter),
-                "PasswordHash": hashed_pwd,
-                "Phone": generate_vn_phone(),
-                "Birthday": fake.date_of_birth(minimum_age=16, maximum_age=70).strftime("%Y-%m-%d"),
-                "Gender": random.choice(['Male', 'Female', 'Other']),
-                "FollowerCount": random.randint(0, 50000),
-                "CreatedAt": created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                "Status": 'Active',
-                "LastLoginDate": last_login.strftime("%Y-%m-%d %H:%M:%S") if last_login else None
+                "full_name": full_name,
+                "email": get_unique_email(full_name, email_counter),
+                "password_hash": hashed_pwd,
+                "phone": generate_vn_phone(),
+                "birthday": fake.date_of_birth(minimum_age=16, maximum_age=70).strftime("%Y-%m-%d"),
+                "gender": random.choice(['Male', 'Female', 'Other']),
+                "follower_count": random.randint(0, 50000),
+                "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": 'Active',
+                "last_login_date": last_login.strftime("%Y-%m-%d %H:%M:%S") if last_login else None
             })
 
             if len(current_batch) >= batch_limit:

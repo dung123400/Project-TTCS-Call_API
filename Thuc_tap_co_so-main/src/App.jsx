@@ -7,6 +7,8 @@ import Product from './pages/public/Product'
 import Cart from './pages/public/Cart'
 import ShopList from './pages/public/ShopList';
 import Shop from './pages/public/Shop'
+import Account from './pages/public/Account'
+
 const MainLayout = () => {
   return (
     <>
@@ -35,6 +37,8 @@ export default function App() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/shop" element={<ShopList />} />
           <Route path="/shop/:id" element={<Shop />} />
+          <Route path="/account" element={<Account />} /> 
+          <Route path="/account/:active_tab" element={<Account />} />
         </Route>
       </Routes>
     </BrowserRouter>
