@@ -21,7 +21,7 @@ public class Voucher {
     private LocalDateTime deletedAt;
 
     @ManyToOne
-    @JoinColumn(name = "shopid")
+    @JoinColumn(name = "shopID")
     private Shop shop;
 
     public Shop getShop() {

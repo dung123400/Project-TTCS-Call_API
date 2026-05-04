@@ -288,15 +288,26 @@ export default function Product() {
 
                 <div className='shop-metrics'>
                     <div className='metric'>
-                        <strong>{shop?.productCount || 158}</strong>
+                        {/* Lấy số đếm từ backend trả về */}
+                        <strong>{product?.shopProductCount || 0}</strong>
                         <span>Sản phẩm</span>
                     </div>
                     <div className='metric'>
-                        <strong>{shop?.followers || 8200}</strong>
+                        {/* Thuộc tính followerCount đã có sẵn trong bảng Shop */}
+                        <strong>
+                            {shop?.followerCount >= 1000 
+                                ? (shop.followerCount / 1000).toFixed(1) + 'k' 
+                                : (shop?.followerCount || 0)}
+                        </strong>
                         <span>Theo dõi</span>
                     </div>
                     <div className='metric'>
-                        <strong>{shop?.sales || '45k'}</strong>
+                        {/* Lấy tổng lượt bán từ backend, format thêm chữ 'k' nếu > 1000 */}
+                        <strong>
+                            {product?.shopTotalSales >= 1000 
+                                ? (product.shopTotalSales / 1000).toFixed(1) + 'k' 
+                                : (product?.shopTotalSales || 0)}
+                        </strong>
                         <span>Lượt bán</span>
                     </div>
                 </div>

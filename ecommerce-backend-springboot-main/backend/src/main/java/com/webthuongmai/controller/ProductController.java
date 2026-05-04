@@ -106,6 +106,18 @@ public class ProductController {
         response.put("images", productRepository.getImagesByProductId(id));
         response.put("soldCount", productRepository.getSoldCountByProductId(id));
 
+        // THÊM 2 DÒNG NÀY ĐỂ TRẢ VỀ SỐ LIỆU THẬT CỦA SHOP
+        if (product.getShop() != null) {
+            Long shopId = product.getShop().getShopID();
+            response.put("shopProductCount", productRepository.countByShop_ShopID(shopId));
+            response.put("shopTotalSales", productRepository.getTotalSalesByShopId(shopId));
+        }
+
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/shop/{shopId}/all")
+    public ResponseEntity<List<ProductDTO>> getAllProductsByShop(@PathVariable Long shopId) {
+        return ResponseEntity.ok(productRepository.findAllProductsWithDetailsByShop(shopId));
     }
 }

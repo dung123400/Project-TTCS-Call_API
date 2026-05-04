@@ -1,6 +1,7 @@
 package com.webthuongmai.controller;
 import com.webthuongmai.entity.Shop;
 import com.webthuongmai.repository.ShopRepository;
+import com.webthuongmai.repository.ShopFollowRepository;
 import com.webthuongmai.service.ShopService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -34,10 +35,25 @@ public class ShopController {
         return shopService.createShop(shop);
     }
 
+    // Sửa lại API này
     @PostMapping("/{id}/follow")
     public ResponseEntity<Shop> followShop(
             @PathVariable Long id,
+            @RequestParam Long userId, // <--- THÊM DÒNG NÀY
             @RequestParam boolean isFollowing) {
-        return ResponseEntity.ok(shopService.updateFollowerCount(id, isFollowing));
+
+        // Truyền thêm userId vào hàm service
+        return ResponseEntity.ok(shopService.updateFollowerCount(id, userId, isFollowing));
+    }
+
+    // Nhớ khai báo thêm cái này ở đầu Class
+    @Autowired
+    private com.webthuongmai.repository.ShopFollowRepository shopFollowRepository;
+
+    // THÊM API NÀY XUỐNG CUỐI FILE
+    @GetMapping("/{id}/check-follow")
+    public ResponseEntity<Boolean> checkFollowStatus(@PathVariable Long id, @RequestParam Long userId) {
+        boolean isFollowed = shopFollowRepository.existsByUser_UserIDAndShop_ShopID(userId, id);
+        return ResponseEntity.ok(isFollowed);
     }
 }

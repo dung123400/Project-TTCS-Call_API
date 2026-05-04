@@ -28,6 +28,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByShop_ShopIDAndProductIDNot(Long shopId, Long productId);
 
+    List<Product> findByShop_ShopID(Long shopId);
+
     @Query(value = "SELECT p.productid AS productID, " +
             "p.product_name AS productName, " +
             "(SELECT TOP 1 image_url FROM product_image WHERE productid = p.productid ORDER BY is_main DESC) AS imageURL, " +
@@ -47,8 +49,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query(value = "SELECT image_url AS imageURL FROM product_image WHERE productid = :productId", nativeQuery = true)
     List<Map<String, Object>> getImagesByProductId(@Param("productId") Long productId);
 
+    // Đếm tổng số sản phẩm của một Shop
+    int countByShop_ShopID(Long shopId);
+
+    // Tính tổng số lượng sản phẩm đã bán của một Shop (cộng dồn từ OrderItems)
+    @Query(value = "SELECT ISNULL(SUM(oi.quantity), 0) FROM order_items oi JOIN product_variant pv ON oi.variantid = pv.variantid JOIN product p ON pv.productid = p.productid WHERE p.shopid = :shopId", nativeQuery = true)
+    Integer getTotalSalesByShopId(@Param("shopId") Long shopId);
+
     // Tính tổng số lượng đã bán
     @Query(value = "SELECT ISNULL(SUM(oi.quantity), 0) FROM order_items oi JOIN product_variant pv ON oi.variantid = pv.variantid WHERE pv.productid = :productId", nativeQuery = true)
     Integer getSoldCountByProductId(@Param("productId") Long productId);
+
+    @Query(value = "SELECT p.productid AS productID, " +
+            "p.product_name AS productName, " +
+            "(SELECT TOP 1 image_url FROM product_image WHERE productid = p.productid ORDER BY is_main DESC) AS imageURL, " +
+            "(SELECT MIN(price) FROM product_variant WHERE productid = p.productid) AS price, " +
+            "(SELECT TOP 1 variantid FROM product_variant WHERE productid = p.productid ORDER BY price ASC) AS variantID, " +
+            "ISNULL((SELECT SUM(oi.quantity) FROM order_items oi JOIN product_variant pv ON oi.variantid = pv.variantid WHERE pv.productid = p.productid), 0) AS soldCount, " +
+            "ISNULL(s.rating, 5.0) AS shopRating " +
+            "FROM product p " +
+            "LEFT JOIN shop s ON p.shopid = s.shopid " +
+            "WHERE p.shopid = :shopId", nativeQuery = true)
+    List<ProductDTO> findAllProductsWithDetailsByShop(@Param("shopId") Long shopId);
 
 }
