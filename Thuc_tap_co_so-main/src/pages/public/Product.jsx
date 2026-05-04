@@ -27,11 +27,15 @@ export default function Product() {
     
     // Thêm State quản lý Số lượng mua
     const [quantity, setQuantity] = useState(1);
+    
+    // Thêm State quản lý Đánh giá sản phẩm
+    const [reviews, setReviews] = useState([]);
 
-    // 1. GỌI API LẤY CHI TIẾT SẢN PHẨM
+    // 1. GỌI API LẤY CHI TIẾT SẢN PHẨM VÀ ĐÁNH GIÁ
     useEffect(() => {
         const fetchProductDetail = async () => {
             try {
+                // Kéo thông tin chi tiết sản phẩm
                 const response = await fetch(`http://localhost:8081/api/products/${id}`);
                 if (response.ok) {
                     const data = await response.json();
@@ -65,8 +69,16 @@ export default function Product() {
                         setSelectedVariantId(productVariants[0].variantID || productVariants[0].variantid || productVariants[0].id);
                     }
                 }
+
+                // Kéo danh sách đánh giá của sản phẩm
+                const reviewRes = await fetch(`http://localhost:8081/api/reviews/product/${id}`);
+                if (reviewRes.ok) {
+                    const reviewData = await reviewRes.json();
+                    setReviews(reviewData);
+                }
+
             } catch (error) {
-                console.error("Lỗi khi tải chi tiết sản phẩm:", error);
+                console.error("Lỗi khi tải dữ liệu:", error);
             }
         };
 
@@ -123,7 +135,7 @@ export default function Product() {
                 body: JSON.stringify({
                     userId: userId,
                     variantId: selectedVariantId,
-                    quantity: quantity // Truyền số lượng thực tế user đã chọn
+                    quantity: quantity
                 })
             });
 
@@ -221,7 +233,7 @@ export default function Product() {
                     )}
                     <br />
 
-                    {/* Khối chọn Số lượng mới thêm */}
+                    {/* Khối chọn Số lượng */}
                     <div className='selection-group'>
                         <p>Số lượng:</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
@@ -253,18 +265,31 @@ export default function Product() {
             {/* Đánh giá */}
             <div className='review-section'>
                 <div className='review-header'>
-                    <h3>Đánh giá ({shop?.rating || 4}⭐)</h3>
-                    <span className='show-more-text'>Hiển thị thêm</span>
+                    <h3>Đánh giá ({shop?.rating || 5}⭐)</h3>
+                    {reviews.length > 0 && <span className='show-more-text'>Hiển thị thêm</span>}
                 </div>
                 
-                <div className='review-content'>
-                    <div className='review-user'>
-                        <strong>Nguyễn Văn A</strong>
-                        <span className='review-stars'>5⭐</span>
-                        <span className='review-date'>20/03/2024</span>
-                    </div>
-                    <p className='review-text'>Áo đẹp lắm mọi người ơi, vải dày dặn!</p>
-                </div>
+                {reviews.length === 0 ? (
+                    <p style={{padding: '10px 20px', color: '#666', fontStyle: 'italic'}}>
+                        Sản phẩm này chưa có đánh giá nào.
+                    </p>
+                ) : (
+                    reviews.map((rev) => {
+                        const revId = rev.reviewID || rev.reviewid || rev.id;
+                        return (
+                            <div className='review-content' key={revId}>
+                                <div className='review-user'>
+                                    <strong>{rev.user?.fullName || "Khách hàng"}</strong>
+                                    <span className='review-stars'>{rev.rating}⭐</span>
+                                    <span className='review-date'>
+                                        {rev.reviewDate ? new Date(rev.reviewDate).toLocaleDateString('vi-VN') : "Gần đây"}
+                                    </span>
+                                </div>
+                                <p className='review-text'>{rev.comment}</p>
+                            </div>
+                        )
+                    })
+                )}
             </div>
 
             {/* Shop Card */}        
@@ -288,12 +313,10 @@ export default function Product() {
 
                 <div className='shop-metrics'>
                     <div className='metric'>
-                        {/* Lấy số đếm từ backend trả về */}
                         <strong>{product?.shopProductCount || 0}</strong>
                         <span>Sản phẩm</span>
                     </div>
                     <div className='metric'>
-                        {/* Thuộc tính followerCount đã có sẵn trong bảng Shop */}
                         <strong>
                             {shop?.followerCount >= 1000 
                                 ? (shop.followerCount / 1000).toFixed(1) + 'k' 
@@ -302,7 +325,6 @@ export default function Product() {
                         <span>Theo dõi</span>
                     </div>
                     <div className='metric'>
-                        {/* Lấy tổng lượt bán từ backend, format thêm chữ 'k' nếu > 1000 */}
                         <strong>
                             {product?.shopTotalSales >= 1000 
                                 ? (product.shopTotalSales / 1000).toFixed(1) + 'k' 
